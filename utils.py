@@ -3,19 +3,22 @@
 from copy import deepcopy
 
 
-def printBoard(board):
-    # player = "\U0001F535"
-    # AI = "\u26AA"
+def printBoard(board, mill_board_state):
     player = "W"
     AI = "B"
     empty = " "
-    print("    ", end="")
-    print(*list(range(9)), sep="     ")
+    print(" " * 7, end="")
+    print(*list(range(9)), sep=" " * 10)
     print("   ", end="")
-    print("_" * 54)
+    print("_" * 98)
     for col in range(9):
         print(str(col) + "  ", end="")
         for row in range(9):
+            if mill_board_state[col * 9 + row * 1] == True:
+                mill = "(M)"
+            else:
+                mill = "  "
+
             if board[col * 9 + row * 1] == "1":
                 color = player
             elif board[col * 9 + row * 1] == "2":
@@ -23,17 +26,16 @@ def printBoard(board):
             else:
                 color = " "
 
-            print(f"{color:^5}|", end="")
+            print(f"{color:^5}{mill:^5}|", end="")
         print("")
         print("   ", end="")
-        print("_" * 54)
+        print("_" * 98)
 
 
 # Function to find adjacent locations for a given location.
 # Returns a list of adjacent location
 
 
-##改
 def adjacentLocations(position):
     adjacent = [[] for _ in range(81)]
     for i in range(81):
@@ -51,56 +53,128 @@ def adjacentLocations(position):
     return adjacent[position]
 
 
-# Function to check if 2 positions have the player on them
-# Takes player symbol as input (1 or 2)
-# Board list as input
-# p1 and p2, the two positions
-# Returns boolean values
-def isPlayer(player, board, p1, p2):
-    if board[p1] == player and board[p2] == player:
-        return True
-    else:
-        return False
-
-
-##改 for loop
 # Function to check if a player can make a mill in the next move.
 # Return True if the player can create a mill
-def checkNextMill(position, board, player):
-    mills_possible = [[] for _ in range(81)]
-    for i in range(81):
-        row = i // 9
-        col = i % 9
-        if col > 0 and col < 8:
-            mills_possible[i].append([i - 1, i + 1])
-        if row > 0 and row < 8:
-            mills_possible[i].append([i - 9, i + 9])
-        if col > 1:
-            mills_possible[i].append([i - 2, i - 1])
-        if col < 7:
-            mills_possible[i].append([i + 1, i + 2])
-        if row > 1:
-            mills_possible[i].append([i - 2 * 9, i - 1 * 9])
-        if row < 7:
-            mills_possible[i].append([i + 1 * 9, i + 2 * 9])
+def checkNextMill(position, board, player, mill_board_state):
+    # potential_mills: list of all possible mills in that "position"
+    # potential_mills[index]: the three position of one possible mill.
 
-    mill = [False for _ in range(81)]
-    for i in range(81):
-        for mill_possible in mills_possible[i]:
-            if isPlayer(player, board, mill_possible[0], mill_possible[1]):
-                mill[i] = True
+    potential_mills = []
+    row = position // 9
+    col = position % 9
 
-    return mill[position]
+    if 0 < col < 8 and all(
+        board[mill_p] == player and not mill_board_state[mill_p]
+        for mill_p in [position, position - 1, position + 1]
+    ):
+        potential_mills.append([position, position - 1, position + 1])
+
+    if 0 < row < 8 and all(
+        board[mill_p] == player and not mill_board_state[mill_p]
+        for mill_p in [position, position - 9, position + 9]
+    ):
+        potential_mills.append([position, position - 9, position + 9])
+
+    if col > 1 and all(
+        board[mill_p] == player and not mill_board_state[mill_p]
+        for mill_p in [position, position - 2, position - 1]
+    ):
+        potential_mills.append([position, position - 2, position - 1])
+
+    if col < 7 and all(
+        board[mill_p] == player and not mill_board_state[mill_p]
+        for mill_p in [position, position + 1, position + 2]
+    ):
+        potential_mills.append([position, position + 1, position + 2])
+
+    if row > 1 and all(
+        board[mill_p] == player and not mill_board_state[mill_p]
+        for mill_p in [position, position - 2 * 9, position - 1 * 9]
+    ):
+        potential_mills.append([position, position - 2 * 9, position - 1 * 9])
+
+    if row < 7 and all(
+        board[mill_p] == player and not mill_board_state[mill_p]
+        for mill_p in [position, position + 1 * 9, position + 2 * 9]
+    ):
+        potential_mills.append([position, position + 1 * 9, position + 2 * 9])
+
+    selected_mill = None
+    if len(potential_mills) > 1:
+        # selected_mill = ui.get_mill_choice_input(potential_mills)
+        selected_mill = potential_mills[0]
+    elif len(potential_mills):
+        selected_mill = potential_mills[0]
+    if selected_mill:
+        for piece in selected_mill:
+            mill_board_state[piece] = True
+        return True
+    return False
 
 
-# Return True if a player has a mill on the given position
+# if player breaks a mill, in that "position", update the mill_board_state
+def checkDeletetMill(position, board, player, mill_board_state):
+    potential_mills = []
+    row = position // 9
+    col = position % 9
+
+    if 0 < col < 8 and all(
+        board[mill_p] == player and mill_board_state[mill_p]
+        for mill_p in [position, position - 1, position + 1]
+    ):
+        potential_mills.append([position, position - 1, position + 1])
+
+    if 0 < row < 8 and all(
+        board[mill_p] == player and mill_board_state[mill_p]
+        for mill_p in [position, position - 9, position + 9]
+    ):
+        potential_mills.append([position, position - 9, position + 9])
+
+    if col > 1 and all(
+        board[mill_p] == player and mill_board_state[mill_p]
+        for mill_p in [position, position - 2, position - 1]
+    ):
+        potential_mills.append([position, position - 2, position - 1])
+
+    if col < 7 and all(
+        board[mill_p] == player and mill_board_state[mill_p]
+        for mill_p in [position, position + 1, position + 2]
+    ):
+        potential_mills.append([position, position + 1, position + 2])
+
+    if row > 1 and all(
+        board[mill_p] == player and mill_board_state[mill_p]
+        for mill_p in [position, position - 2 * 9, position - 1 * 9]
+    ):
+        potential_mills.append([position, position - 2 * 9, position - 1 * 9])
+
+    if row < 7 and all(
+        board[mill_p] == player and mill_board_state[mill_p]
+        for mill_p in [position, position + 1 * 9, position + 2 * 9]
+    ):
+        potential_mills.append([position, position + 1 * 9, position + 2 * 9])
+
+    selected_mill = None
+    if len(potential_mills) > 1:
+        # selected_mill = ui.get_mill_choice_input(potential_mills)
+        selected_mill = potential_mills[0]
+    elif len(potential_mills):
+        selected_mill = potential_mills[0]
+    if selected_mill:
+        for piece in selected_mill:
+            mill_board_state[piece] = False
+
+    return mill_board_state
+
+
+# Return True if a player can form a "new" mill on the given position
 # Each position has an index
-def isMill(position, board):
+def isMill(position, board, mill_board_state):
     p = board[position]
     # The player on that position
     if p != "x":
         # If there is some player on that position
-        return checkNextMill(position, board, p)
+        return checkNextMill(position, board, p, mill_board_state)
     else:
         return False
 
@@ -111,30 +185,64 @@ def numOfPieces(board, value):
     return board.count(value)
 
 
-## board list: possible remove
+##if a player form a mill
+# check whether there is a piece of opponent that doesn't form a mill which is possible to remove.
+def check_No_Removable_Pieces(board, mill_board_state):
+    all_opponent_pos = [i for i in range(len(board)) if board[i] == "2"]
+    all_possible_remove_opponent_pos = [
+        j for j in all_opponent_pos if mill_board_state[j] == False
+    ]
+    if len(all_possible_remove_opponent_pos) == 0:
+        return True
+
+
 # Function to remove a piece from the board.
 # Takes a copy of the board, current positions,
 # and player number as input.
 # If the player is 1, then a piece of player 2 is removed, and vice versa
-def removePiece(board_copy, board_list, player):
+def removePiece(
+    board_copy, board_list, player, mill_board_state_copy, mill_board_state_list, stage
+):
     for i in range(len(board_copy)):
         if player == "1":
             opp = "2"
         else:
             opp = "1"
-        if board_copy[i] == opp:
-            if not isMill(i, board_copy):
-                new_board = deepcopy(board_copy)
+
+        if stage != 3 and board_copy[i] == opp:
+            if not mill_board_state_copy[i] == True:
+                new_board = deepcopy(
+                    board_copy
+                )  # boad_copy would not be affected when new_board changes
                 new_board[i] = "x"
                 # Making a new board and emptying the position where piece is removed
                 board_list.append(new_board)
-    return board_list
+                mill_board_state_list.append(mill_board_state_copy)
+
+        if stage == 3 and board_copy[i] == opp:
+            new_board = deepcopy(
+                board_copy
+            )  # boad_copy would not be affected when new_board changes
+            new_board[i] = "x"
+            # Making a new board and emptying the position where piece is removed
+            mill_board_state_copy = checkDeletetMill(
+                i, board_copy, opp, mill_board_state_copy
+            )
+            board_list.append(new_board)
+            mill_board_state_list.append(mill_board_state_copy)
+    return board_list, mill_board_state_list
+
+
+#####################################################################
+### ALL FUNCTIONS NECESSARY FOR AI:
 
 
 # Generating all possible moves for stage 1 of the game.
 # That is, when the players are still placing their pieces.
-def possibleMoves_stage1(board):
+def possibleMoves_stage1(board, mill_board_state):
+    stage = 1
     board_list = []
+    mill_board_state_list = []
     for i in range(len(board)):
         # Fill empty positions with player 1
         if board[i] == "x":
@@ -142,21 +250,46 @@ def possibleMoves_stage1(board):
             # and removing pieces if a Mill can be formed
             board_copy = deepcopy(board)
             board_copy[i] = "1"
+            mill_board_state_copy = deepcopy(mill_board_state)
 
-            if isMill(i, board_copy):
+            if isMill(i, board_copy, mill_board_state_copy):
                 # Remove a piece if a mill is formed on that position
-                board_list = removePiece(board_copy, board_list, "1")
+                ## player 1 form a mill and remove a piece of player 2
+
+                No_removable_pieces = check_No_Removable_Pieces(
+                    board_copy, mill_board_state_copy
+                )
+
+                if No_removable_pieces:
+                    board_list.append(board_copy)
+                    mill_board_state_list.append(mill_board_state_copy)
+
+                else:
+                    board_list, mill_board_state_list = removePiece(
+                        board_copy,
+                        board_list,
+                        "1",
+                        mill_board_state_copy,
+                        mill_board_state_list,
+                        stage,
+                    )
             else:
                 # No mill, so just append the position
                 board_list.append(board_copy)
+                mill_board_state_list.append(mill_board_state_copy)
 
-    return board_list
+    return board_list, mill_board_state_list
 
 
 # Generating all possible moves for stage 2 of the game
 # That is, when both players have placed all their pieces
-def possibleMoves_stage2(board, player):
+from copy import deepcopy
+
+
+def possibleMoves_stage2(board, player, mill_board_state):
+    stage = 2
     board_list = []
+    mill_board_state_list = []
     for i in range(len(board)):
         if board[i] == player:
             adjacent_list = adjacentLocations(i)
@@ -166,51 +299,97 @@ def possibleMoves_stage2(board, player):
                     # If the location is empty, then the piece can move there
                     # Hence, generating all possible combinations
                     board_copy = deepcopy(board)
+                    mill_board_state_copy = deepcopy(mill_board_state)
+                    # check the mill condition before delete the piece in i position
+                    mill_board_state_copy = checkDeletetMill(
+                        i, board_copy, player, mill_board_state_copy
+                    )
+
                     board_copy[i] = "x"
                     # Emptying the current location, moving the piece to new position
                     board_copy[pos] = player
+                    # print("Move", i, "to", pos)
 
-                    if isMill(pos, board_copy):
+                    if isMill(pos, board_copy, mill_board_state_copy):
                         # in case of mill, remove Piece
-                        board_list = removePiece(board_copy, board_list, player)
+                        No_removable_pieces = check_No_Removable_Pieces(
+                            board_copy, mill_board_state_copy
+                        )
+
+                        if No_removable_pieces:
+                            board_list.append(board_copy)
+                            mill_board_state_list.append(mill_board_state_copy)
+
+                        else:
+                            board_list, mill_board_state_list = removePiece(
+                                board_copy,
+                                board_list,
+                                player,
+                                mill_board_state_copy,
+                                mill_board_state_list,
+                                stage,
+                            )
                     else:
                         board_list.append(board_copy)
-    return board_list
+                        mill_board_state_list.append(mill_board_state_copy)
+    return board_list, mill_board_state_list
 
 
 # Generating all possible moves for stage 3 of the game
 # That is, when one player has only 3 pieces
-def possibleMoves_stage3(board, player):
+def possibleMoves_stage3(board, player, mill_board_state):
+    stage = 3
     board_list = []
+    mill_board_state_list = []
 
     for i in range(len(board)):
         if board[i] == player:
             for j in range(len(board)):
                 if board[j] == "x":
                     board_copy = deepcopy(board)
+                    mill_board_state_copy = deepcopy(mill_board_state)
+                    # check the mill condition before delete the piece in i position
+                    mill_board_state_copy = checkDeletetMill(
+                        i, board_copy, player, mill_board_state_copy
+                    )
                     # The piece can fly to any empty position, not only adjacent ones
                     # So, generating all possible positions for the pieces
                     board_copy[i] = "x"
                     board_copy[j] = player
 
-                    if isMill(j, board_copy):
+                    if isMill(j, board_copy, mill_board_state_copy):
+                        # No_removable_pieces = check_No_Removable_Pieces(
+                        #     board_copy, mill_board_state_copy
+                        # )
+
+                        # if No_removable_pieces:
+                        #     board_list.append(board_copy)
+                        #     mill_board_state_list.append(mill_board_state_copy)
+                        # else:
+
                         # If a Mill is formed, remove piece
-                        board_list = removePiece(board_copy, board_list, player)
+                        board_list, mill_board_state_list = removePiece(
+                            board_copy,
+                            board_list,
+                            player,
+                            mill_board_state_copy,
+                            mill_board_state_list,
+                            stage,
+                        )
                     else:
                         board_list.append(board_copy)
-    return board_list
+                        mill_board_state_list.append(mill_board_state_copy)
+
+    return board_list, mill_board_state_list
 
 
 # Checks if game is in stage 2 or 3
 # Returns possible moves accordingly
-def possibleMoves_stage2or3(board, player="1"):
-    if numOfPieces(board, player) == 3:
-        return possibleMoves_stage3(board, player)
+def possibleMoves_stage2or3(board, player, mill_board_state):
+    if numOfPieces(board, "1") > 3 and numOfPieces(board, "2") > 3:
+        return possibleMoves_stage2(board, player, mill_board_state)
     else:
-        return possibleMoves_stage2(board, player)
-
-
-# ALL FUNCTIONS NECESSARY FOR AI:
+        return possibleMoves_stage3(board, player, mill_board_state)
 
 
 # Class to check if the game is completed, and who won
@@ -218,14 +397,7 @@ class evaluate:
     def __init__(self):
         self.evaluate = 0
         self.board = []
-
-
-pruned = 0
-states_reached = 0
-alpha = float("-inf")
-beta = float("inf")
-depth = 2
-ai_depth = 3
+        self.mill_board_state = []
 
 
 # Function to invert the board, to train the artificial intelligence
@@ -241,117 +413,214 @@ def InvertedBoard(board):
     return invertedboard
 
 
-# Function to generate inverted board lists from a list of positions.
-def generateInvertedBoardList(pos_list):
+# Function to generate inverted board lists from a list of board_ state.
+def generateInvertedBoardList(possible_configs_board, possible_configs_mill):
     result = []
-    for i in pos_list:
+    # i: a board_state
+    for i in possible_configs_board:
         result.append(InvertedBoard(i))
-    return result
+    return result, possible_configs_mill
 
 
-# Function to find possible mill counts for a certain player.
-def getPossibleMillCount(board, player):
-    count = 0
-
-    for i in range(len(board)):
-        if board[i] == "x":
-            if checkNextMill(i, board, player):
-                count += 1
-    return count
-
-
-# Function to find if a potential mill is in correct formation
-# Return boolean values
-def potentialMillInFormation(position, board, player):
-    adjacent_list = adjacentLocations(position)
-
-    for i in adjacent_list:
-        if (board[i] == player) and (not checkNextMill(position, board, player)):
-            return True
-    return False
-
-
-# Function to get how many pieces can potentially form a mill
-def getPiecesInPotentialMillFormation(board, player):
-    count = 0
-
-    for i in range(len(board)):
-        if board[i] == player:
-            adjacent_list = adjacentLocations(i)
-            for pos in adjacent_list:
-                if player == "1":
-                    if board[pos] == "2":
-                        board[i] = "2"
-                        if isMill(i, board):
-                            count += 1
-                        board[i] = player
-                else:
-                    if board[pos] == "1" and potentialMillInFormation(pos, board, "1"):
-                        count += 1
-    return count
-
-
+# change stage1 stage 2 in maximizer and minimizer
 # Our main function to find solutions for the Game. Uses MiniMax algorithm.
-def minimax(board, depth, player1, alpha, beta, isStage1, heuristic):
+def minimax(
+    board, mill_board_state, depth, player1, alpha, beta, isStage1, heuristic, isStage3
+):
     finalEvaluation = evaluate()
+    if depth == 0:
+        finalEvaluation.evaluate = heuristic(board, isStage1, mill_board_state)
 
-    global states_reached
-    states_reached += 1
-
-    if depth != 0:
+    elif depth != 0:
         currentEvaluation = evaluate()
 
         if player1:
             if isStage1:
-                possible_configs = possibleMoves_stage1(board)
-                # print("p1:T, stage1:",possible_configs)
+                possible_configs_board, possible_configs_mill = possibleMoves_stage1(
+                    board, mill_board_state
+                )
+
             else:
-                possible_configs = possibleMoves_stage2or3(board)
-                # print("p1:T, stage2/3:",possible_configs)
+                possible_configs_board, possible_configs_mill = possibleMoves_stage2or3(
+                    board, "1", mill_board_state
+                )
 
         else:
             if isStage1:
-                possible_configs = generateInvertedBoardList(
-                    possibleMoves_stage1(InvertedBoard(board))
+                possible_configs_board, possible_configs_mill = possibleMoves_stage1(
+                    InvertedBoard(board), mill_board_state
                 )
-                # print("p1:F, stage1:",possible_configs)
+                (
+                    possible_configs_board,
+                    possible_configs_mill,
+                ) = generateInvertedBoardList(
+                    possible_configs_board, possible_configs_mill
+                )
 
             else:
-                possible_configs = generateInvertedBoardList(
-                    possibleMoves_stage2or3(InvertedBoard(board))
+                possible_configs_board, possible_configs_mill = possibleMoves_stage2or3(
+                    InvertedBoard(board), "1", mill_board_state
                 )
-                # print("p1:F, stage2/3:",possible_configs)
-
-        for move in possible_configs:
-            if player1:  ## ismaximizing player
-                currentEvaluation = minimax(
-                    move, depth - 1, False, alpha, beta, isStage1, heuristic
+                (
+                    possible_configs_board,
+                    possible_configs_mill,
+                ) = generateInvertedBoardList(
+                    possible_configs_board, possible_configs_mill
                 )
 
-                if currentEvaluation.evaluate > alpha:
-                    alpha = currentEvaluation.evaluate
-                    finalEvaluation.board = move
+        movablePieces = len(possible_configs_board)
+        ###
+        if player1:  ## ismaximizing player
+            if isStage1:
+                maxEva = float("-inf")
+                for move, new_mill_board_state in zip(
+                    possible_configs_board, possible_configs_mill
+                ):
+                    currentEvaluation = minimax(
+                        move,
+                        new_mill_board_state,
+                        depth - 1,
+                        False,
+                        alpha,
+                        beta,
+                        isStage1,
+                        heuristic,
+                        isStage3,
+                    )
+
+                    if currentEvaluation.evaluate > maxEva:
+                        maxEva = currentEvaluation.evaluate
+                        finalEvaluation.evaluate = currentEvaluation.evaluate
+                        finalEvaluation.board = move
+                        finalEvaluation.mill_board_state = new_mill_board_state
+
+                    alpha = max(currentEvaluation.evaluate, alpha)
+
+                    if beta <= alpha:
+                        break
             else:
-                currentEvaluation = minimax(
-                    move, depth - 1, True, alpha, beta, isStage1, heuristic
-                )
+                if numOfPieces(board, "1") < 3 or movablePieces == 0:
+                    finalEvaluation.evaluate = float("-inf")
 
-                if currentEvaluation.evaluate < beta:
-                    beta = currentEvaluation.evaluate
-                    finalEvaluation.board = move
+                elif numOfPieces(board, "2") < 3:
+                    finalEvaluation.evaluate = float("inf")
 
-        if player1:
-            finalEvaluation.evaluate = alpha
+                else:
+                    maxEva = float("-inf")
+                    for move, new_mill_board_state in zip(
+                        possible_configs_board, possible_configs_mill
+                    ):
+                        if isStage3:
+                            currentEvaluation = minimax(
+                                move,
+                                new_mill_board_state,
+                                0,
+                                False,
+                                alpha,
+                                beta,
+                                isStage1,
+                                heuristic,
+                                isStage3,
+                            )
+                        else:
+                            currentEvaluation = minimax(
+                                move,
+                                new_mill_board_state,
+                                depth - 1,
+                                False,
+                                alpha,
+                                beta,
+                                isStage1,
+                                heuristic,
+                                isStage3,
+                            )
+
+                        if currentEvaluation.evaluate > maxEva:
+                            maxEva = currentEvaluation.evaluate
+                            finalEvaluation.evaluate = currentEvaluation.evaluate
+                            finalEvaluation.board = move
+                            finalEvaluation.mill_board_state = new_mill_board_state
+
+                        alpha = max(currentEvaluation.evaluate, alpha)
+
+                        if beta <= alpha:
+                            break
+
         else:
-            finalEvaluation.evaluate = beta
+            if isStage1:
+                minEva = float("inf")
 
-    else:
-        if player1:
-            finalEvaluation.evaluate = heuristic(board, isStage1)
-        else:
-            # finalEvaluation.evaluate = heuristic(
-            #   InvertedBoard(board), isStage1)
-            finalEvaluation.evaluate = heuristic(board, isStage1)
+                for move, new_mill_board_state in zip(
+                    possible_configs_board, possible_configs_mill
+                ):
+                    currentEvaluation = minimax(
+                        move,
+                        new_mill_board_state,
+                        depth - 1,
+                        True,
+                        alpha,
+                        beta,
+                        isStage1,
+                        heuristic,
+                        isStage3,
+                    )
+
+                    if currentEvaluation.evaluate < minEva:
+                        minEva = currentEvaluation.evaluate
+                        finalEvaluation.evaluate = currentEvaluation.evaluate
+                        finalEvaluation.board = move
+                        finalEvaluation.mill_board_state = new_mill_board_state
+
+                    beta = min(currentEvaluation.evaluate, beta)
+                    if beta <= alpha:
+                        break
+            else:
+                if numOfPieces(board, "1") < 3 or movablePieces == 0:
+                    finalEvaluation.evaluate = float("-inf")
+
+                elif numOfPieces(board, "2") < 3:
+                    finalEvaluation.evaluate = float("inf")
+
+                else:
+                    minEva = float("inf")
+
+                    for move, new_mill_board_state in zip(
+                        possible_configs_board, possible_configs_mill
+                    ):
+                        if isStage3:
+                            currentEvaluation = minimax(
+                                move,
+                                new_mill_board_state,
+                                0,
+                                False,
+                                alpha,
+                                beta,
+                                isStage1,
+                                heuristic,
+                                isStage3,
+                            )
+                        else:
+                            currentEvaluation = minimax(
+                                move,
+                                new_mill_board_state,
+                                depth - 1,
+                                False,
+                                alpha,
+                                beta,
+                                isStage1,
+                                heuristic,
+                                isStage3,
+                            )
+
+                        if currentEvaluation.evaluate < minEva:
+                            minEva = currentEvaluation.evaluate
+                            finalEvaluation.evaluate = currentEvaluation.evaluate
+                            finalEvaluation.board = move
+                            finalEvaluation.mill_board_state = new_mill_board_state
+
+                        beta = min(currentEvaluation.evaluate, beta)
+                        if beta <= alpha:
+                            break
 
     return finalEvaluation
 
@@ -359,59 +628,147 @@ def minimax(board, depth, player1, alpha, beta, isStage1, heuristic):
 # HEURISTICS:
 
 # Heuristic that finds number of pieces on the board.
-# Lose if less than 3 pieces
+# Lose if the player has less than  3 pieces.
 
 
-def numPiecesHeuristic(board, isStage1):
+def numPiecesHeuristic(board, isStage1, mill_board_state):
     if not isStage1:
-        movablePieces = len(possibleMoves_stage2or3(board))  # player 1 的possible_move
+        movablePieces = len(
+            possibleMoves_stage2or3(board, "1", mill_board_state)
+        )  # player 1 的possible_move
         if numOfPieces(board, "1") < 3 or movablePieces == 0:
-            evaluation = float("-inf")  ## change inf to -inf
-            # print("#p1<=3 or m==0","eva:",evaluation,"p1: ",numOfPieces(board, '1'),"p2: ",numOfPieces(board, '2'))
+            evaluation = float("-inf")
         elif numOfPieces(board, "2") < 3:
-            evaluation = float("inf")  ##change -inf to inf
-            # print("#p2<=3","eva:",evaluation,"p1: ",numOfPieces(board, '1'),"p2: ",numOfPieces(board, '2'))
+            evaluation = float("inf")
         else:
             evaluation = 2 * (numOfPieces(board, "1") - numOfPieces(board, "2"))
-            # print("#stage 2","eva:",evaluation,"p1: ",numOfPieces(board, '1'),"p2: ",numOfPieces(board, '2'))
     else:
         evaluation = 1 * (numOfPieces(board, "1") - numOfPieces(board, "2"))
-        # print("#stage 1","eva:",evaluation,"p1: ",numOfPieces(board, '1'),"p2: ",numOfPieces(board, '2'))
 
     return evaluation
 
 
+def numMillandPiecesHeuristic(board, isStage1, mill_board_state):
+    numMillsPlayer1 = Mill_count(board, "1", mill_board_state)
+    numMillsPlayer2 = Mill_count(board, "2", mill_board_state)
+    # numPossibleMillsPlayer1 = potentialMill_count(board, "1", mill_board_state)
+    # numPossibleMillsPlayer2 = potentialMill_count(board, "2", mill_board_state)
+
+    if not isStage1:
+        movablePieces = len(possibleMoves_stage2or3(board, "1", mill_board_state))
+        if numOfPieces(board, "1") < 3 or movablePieces == 0:
+            evaluation = float("-inf")
+        elif numOfPieces(board, "2") < 3:
+            evaluation = float("inf")
+        else:
+            evaluation = (
+                2 * (numOfPieces(board, "1") - numOfPieces(board, "2"))
+                + numMillsPlayer1
+                - numMillsPlayer2
+                # + numPossibleMillsPlayer1
+                # - numPossibleMillsPlayer2
+            )
+    else:
+        evaluation = (
+            1 * (numOfPieces(board, "1") - numOfPieces(board, "2"))
+            + numMillsPlayer1
+            - numMillsPlayer2
+            # + numPossibleMillsPlayer1
+            # - numPossibleMillsPlayer2
+        )
+
+    return evaluation
+
+
+# not use
 # Heuristic that calculates potential mills as the factor.
-def potentialMillsHeuristic(board, isStage1):
+def potentialMillsHeuristic(board, isStage1, mill_board_state):
     evaluation = 0
 
-    numPossibleMillsPlayer1 = getPossibleMillCount(board, "1")
+    numPossibleMillsPlayer1 = potentialMill_count(board, "1", mill_board_state)
+    numPossibleMillsPlayer2 = potentialMill_count(board, "2", mill_board_state)
+    numMillsPlayer1 = Mill_count(board, "1", mill_board_state)
+    numMillsPlayer2 = Mill_count(board, "2", mill_board_state)
 
     if not isStage1:
-        movablePieces = len(possibleMoves_stage2or3(board))
-
-    potentialMillsPlayer2 = getPiecesInPotentialMillFormation(board, "2")
+        movablePieces = len(possibleMoves_stage2or3(board, "1", mill_board_state))
 
     if not isStage1:
-        if numOfPieces(board, "2") <= 2 or movablePieces == 0:
-            evaluation = float("inf")
-            # print("#p2<=2 or m==0","p1: ",numOfPieces(board, '1'),"p2: ",numOfPieces(board, '2'))
-        elif numOfPieces(board, "1") <= 2:
+        if numOfPieces(board, "1") < 3 or movablePieces == 0:
             evaluation = float("-inf")
-            # print("#p1<=2","p1: ",numOfPieces(board, '1'),"p2: ",numOfPieces(board, '2'))
+        elif numOfPieces(board, "2") < 3:
+            evaluation = float("inf")
         else:
             if numOfPieces(board, "1") < 4:
                 evaluation += 1 * numPossibleMillsPlayer1
-                evaluation += 2 * potentialMillsPlayer2
+                evaluation -= 2 * numPossibleMillsPlayer2
+                evaluation += 2 * numMillsPlayer1
+                evaluation -= 2 * numMillsPlayer2
             else:
                 evaluation += 2 * numPossibleMillsPlayer1
-                evaluation += 1 * potentialMillsPlayer2
+                evaluation -= 1 * numPossibleMillsPlayer2
+                evaluation += 2 * numMillsPlayer1
+                evaluation -= 2 * numMillsPlayer2
     else:
         if numOfPieces(board, "1") < 4:
             evaluation += 1 * numPossibleMillsPlayer1
-            evaluation += 2 * potentialMillsPlayer2
+            evaluation += 2 * numPossibleMillsPlayer2
+            evaluation += 2 * numMillsPlayer1
+            evaluation -= 2 * numMillsPlayer2
         else:
             evaluation += 2 * numPossibleMillsPlayer1
-            evaluation += 1 * potentialMillsPlayer2
-    # print(evaluation)
+            evaluation += 1 * numPossibleMillsPlayer2
+            evaluation += 2 * numMillsPlayer1
+            evaluation -= 2 * numMillsPlayer2
+
     return evaluation
+
+
+# not use
+def potentialMill_count(board, player, mill_board_state):
+    count = 0
+    for position in range(len(board)):
+        if board[position] == "x":
+            row = position // 9
+            col = position % 9
+
+            if 0 < col < 8 and all(
+                board[mill_p] == player and mill_board_state[mill_p]
+                for mill_p in [position - 1, position + 1]
+            ):
+                count += 1
+
+            if 0 < row < 8 and all(
+                board[mill_p] == player and mill_board_state[mill_p]
+                for mill_p in [position - 9, position + 9]
+            ):
+                count += 1
+            if col > 1 and all(
+                board[mill_p] == player and mill_board_state[mill_p]
+                for mill_p in [position - 2, position - 1]
+            ):
+                count += 1
+            if col < 7 and all(
+                board[mill_p] == player and mill_board_state[mill_p]
+                for mill_p in [position + 1, position + 2]
+            ):
+                count += 1
+            if row > 1 and all(
+                board[mill_p] == player and mill_board_state[mill_p]
+                for mill_p in [position - 2 * 9, position - 1 * 9]
+            ):
+                count += 1
+            if row < 7 and all(
+                board[mill_p] == player and mill_board_state[mill_p]
+                for mill_p in [position + 1 * 9, position + 2 * 9]
+            ):
+                count += 1
+    return count
+
+
+def Mill_count(board, player, mill_board_state):
+    count = 0
+    for position in range(len(board)):
+        if board[position] == player and mill_board_state[position] == True:
+            count += 1
+    return count
